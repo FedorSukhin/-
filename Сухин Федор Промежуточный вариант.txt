@@ -1,0 +1,569 @@
+#include <iostream>
+#include<time.h>
+#include<vector>
+#include<time.h>
+#include<algorithm>
+#include<map>
+#include<string>
+#include <string.h>
+#define _WIN32_WINNT 0x0502 
+#include <Windows.h>
+#include <stdlib.h>
+#include<io.h>
+#include <conio.h>
+
+
+
+using namespace std;
+using namespace  std;
+
+enum Color { Black = 0, Blue, Green, Cyan, Red, Magenta, Brown, LightGray, DarkGray, LightBlue, LightGreen, LightCyan, LightRed, LightMagenta, Yellow, White };
+
+enum Direction { Up = 72, Left = 75, Right = 77, Down = 80, Enter = 13, esc = 27, space = 32 };
+HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);//получает дискриптор активного окна
+
+void SetColor(Color text, Color background)
+{
+	SetConsoleTextAttribute(hStdOut, (WORD)((background << 4) | text));
+}
+//COORD sizeOfBuff = { 150,47 };
+//SetConsoleScreenBufferSize(hStdOut,sizeOfBuff);
+
+void SetCursor(int x, int y)
+{
+	COORD myCoords = { x,y };//инициализируем передаваемыми значениями объект координат
+	SetConsoleCursorPosition(hStdOut, myCoords);
+}
+const int GlobalSizeAriaX = 150;// 104 - поле, 46 иформационное пространство
+const int GlobalSizeAriaY = 52;// поле 26х26 кубиков
+const int SizeTank = 2;
+const int GlobalSizeBattle = 15;
+int masAria[GlobalSizeBattle][GlobalSizeBattle] = {};
+
+//функция преобразования моего направление(1-4) в enum Direction
+int SwichDirection(int temp)
+{
+	int dir = 0;
+	switch (temp)
+	{
+	case 1:
+		dir = Up;
+		break;
+	case 2:
+		dir = Left;
+		break;
+	case 3:
+		dir = Right;
+		break;
+	case 4:
+		dir = Down;
+		break;
+	}
+	return dir;
+}
+void DestroyTank()
+{
+
+}
+//описываем класс танк основной
+class Tank
+{
+protected:
+	int X;//Х левый верхний угол отрисовки танка 
+	int Y;//У левый верхний угол отрисовки танка
+	int Size;//Линейный размер танка
+	int Direction;//Направление движения танка 1 - лево, 2 право, 3 верх, 4 низ
+	int Defens;//Колличество поподаний до уничтожения 1 -минимальное значение
+
+
+public:
+	void SetX(int x)
+	{
+		X = x;
+	}
+	void SetY(int y)
+	{
+		Y = y;
+	}
+	void SetSize(int Size)
+	{
+		this->Size = Size;
+	}
+	void SetDirection(int Dir)
+	{
+		Direction = Dir;
+	}
+	void SetDefens(int Def)
+	{
+		Defens = Def;
+	}
+	int getX()const
+	{
+		return X;
+	}
+	int getY()const
+	{
+		return Y;
+	}
+	int getDirection()const
+	{
+		return Direction;
+	}
+	Tank()
+	{
+		X = 0;
+		Y = 0;
+		Size = SizeTank;
+		Direction = 3;
+		Defens = 1;
+	}
+	~Tank()
+	{
+		DestroyTank();
+	}
+};
+//массив построения танка
+void MasTankView(int mas[SizeTank][SizeTank * 2], int Direction, int Defens)
+{
+	for (size_t i = 0; i < SizeTank; i++)
+	{
+		for (size_t j = 0; j < SizeTank * 2; j++)
+		{
+			if (Direction == 1)
+			{
+				mas[i][0] = 2;
+				mas[i][1] = 2;
+				mas[i][SizeTank * 2 - 1] = 1;
+				mas[i][SizeTank * 2 - 2] = 1;
+			}
+			else if (Direction == 2)
+			{
+				mas[i][0] = 1;
+				mas[i][1] = 1;
+				mas[i][SizeTank * 2 - 1] = 2;
+				mas[i][SizeTank * 2 - 2] = 2;
+			}
+			else if (Direction == 3)
+			{
+				mas[0][j] = 2;
+				mas[SizeTank - 1][j] = 1;
+			}
+			else if (Direction == 4)
+			{
+				mas[0][j] = 1;
+				mas[SizeTank - 1][j] = 2;
+			}
+		}
+	}
+}
+
+//отрисовка танка
+void tankImage(int mas[SizeTank][SizeTank * 2], Color color, Color pushka, int X, int Y)
+{
+	int x = X, y = Y;
+
+	for (size_t i = 0; i < SizeTank; i++)
+	{
+		SetCursor(x * 2, y + i);
+
+		for (size_t j = 0; j < SizeTank * 2; j++)
+		{
+
+			if (mas[i][j] == 1)
+			{
+				SetColor(color, color);
+			}
+			else
+			{
+				SetColor(pushka, pushka);
+			}
+			cout << "*"; SetColor(White, Black);
+		}
+		cout << endl;
+		SetColor(White, Black);
+	}
+}
+//вид танка разных уровней
+class ViewTank : public Tank
+{
+protected:
+	Color color;
+	int mas[SizeTank][SizeTank * 2];
+	int Svoy = 0;//1-свой,2 чужой
+	int Ntanka = 0;
+public:
+	void setColor(Color color)
+	{
+		this->color = color;
+	}
+	ViewTank()
+	{
+		color = Green;
+		MasTankView(mas, Direction, Defens);
+
+	}
+	ViewTank(int x, int y, Color color, int Svoy, int Ntanka)
+	{
+		X = x;
+		Y = y;
+		this->color = color;
+		this->Svoy = Svoy;
+		this->Ntanka = Ntanka;
+		for (size_t i = 0; i < SizeTank; i++)
+		{
+			for (size_t j = 0; j < SizeTank; j++)
+			{
+				masAria[Y + i][X + j] = Svoy * 100 + Ntanka;
+			}
+		}
+	}
+
+	void ShowMas()
+	{
+		for (size_t i = 0; i < 2; i++)
+		{
+			for (size_t j = 0; j < 4; j++)
+			{
+				cout << mas[i][j];
+			}cout << endl;
+		}
+	}
+	//отображение танка и предача информации в поле игры
+	void Show()
+	{
+		MasTankView(mas, Direction, Defens);
+		tankImage(mas, color, LightGray, X, Y);
+		for (size_t i = 0; i < SizeTank; i++)
+		{
+			for (size_t j = 0; j < SizeTank; j++)
+			{
+				masAria[Y + i][X + j] = Svoy * 100 + Ntanka;
+			}
+		}
+	}
+	//закрашивание места танка в черный цвет
+	void AntiShow()
+	{
+		tankImage(mas, Black, Black, X, Y);
+		for (size_t i = 0; i < SizeTank; i++)
+		{
+			for (size_t j = 0; j < SizeTank; j++)
+			{
+				masAria[Y + i][X + j] = 0;
+			}
+		}
+	}
+	~ViewTank()
+	{
+		//AntiShow();
+	};
+};
+int SetDirect(ViewTank& obj, int dir)
+{
+	int temp=dir;
+	do
+	{
+		temp = 1 + rand() % 4;
+	} while (temp==dir);
+	obj.SetDirection(temp);
+	return SwichDirection(temp);
+}
+
+class relief: public Tank
+{
+	int Type;//1-кирпич,2 -бетон,3 - вода,4-лес,5 - лед 
+	int prozrachnost;//1-пуля пролетает, 0 - пуля не пролетает
+public:
+	
+	relief() 
+	{
+	
+	}
+	~relief()
+	{
+	
+	}
+};
+
+class Fire 
+{
+	int direction;// Направление движения танка 1 - лево, 2 право, 3 верх, 4 низ
+	int NumberTank;//К какому танку относится
+public:
+	void setDirection(int dir)
+	{
+		direction = dir;
+	}
+	void setNumber(int Num)
+	{
+		NumberTank = Num;
+	}
+
+
+
+
+};
+//функция движения танка
+int Move(int Dir, ViewTank& obj)
+{
+	int nextstep=0;
+	switch (Dir)
+	{
+	case Up:
+		if (obj.getDirection() == 3)
+		{
+			if (obj.getY() > 0)
+			{
+				if (masAria[obj.getY() - 1][obj.getX()] == 0 && masAria[obj.getY() - 1][obj.getX() + 1] == 0)
+				{
+					obj.AntiShow();
+					obj.SetY(obj.getY() - 1);
+					obj.Show();
+					return Up;
+					break;
+				}
+				else if (masAria[obj.getY() - 1][obj.getX()] != 0 || masAria[obj.getY() - 1][obj.getX() + 1] != 0&&
+					masAria[obj.getY()][obj.getX()] >= 200)
+				{
+					obj.AntiShow();
+					nextstep=SetDirect(obj,3);
+					obj.Show();
+					return nextstep;
+					break;
+				}
+			}
+			else if (obj.getY() == 0 && masAria[obj.getY()][obj.getX()] >= 200)
+			{
+				obj.AntiShow();
+				nextstep=SetDirect(obj,3);
+				obj.Show();
+				return nextstep;
+				break;
+			}
+		}
+		else obj.SetDirection(3);
+		obj.Show();
+		return Up;
+		break;
+	case Left:
+		if (obj.getDirection() == 1)
+		{
+			if (obj.getX() > 0)
+			{
+				if (masAria[obj.getY()][obj.getX() - 1] == 0 && masAria[obj.getY() + 1][obj.getX() - 1] == 0)
+				{
+					obj.AntiShow();
+					obj.SetX(obj.getX() - 1);
+					obj.Show();
+					return Left;
+					break;
+				}
+				else if (masAria[obj.getY()][obj.getX() - 1] != 0 || masAria[obj.getY() + 1][obj.getX() - 1] != 0 &&
+					masAria[obj.getY()][obj.getX()] >= 200)
+				{
+					obj.AntiShow();
+					nextstep=SetDirect(obj, 1);
+					obj.Show();
+					return nextstep;
+					break;
+				}
+			}
+			else if (obj.getX()==0&&masAria[obj.getY()][obj.getX()] >= 200)
+			{
+				obj.AntiShow();
+				nextstep=SetDirect(obj, 1);;
+				obj.Show();
+				return nextstep;
+				break;
+			}
+		}
+		else obj.SetDirection(1);
+		obj.Show();
+		return Left;
+		break;
+	case Right:
+		if (obj.getDirection() == 2)
+		{
+			if (obj.getX() < GlobalSizeBattle - 2)
+			{
+				if (masAria[obj.getY()][obj.getX() + 2] == 0 && masAria[obj.getY() + 1][obj.getX() + 2] == 0)
+				{
+					obj.AntiShow();
+					obj.SetX(obj.getX() + 1);
+					obj.Show();
+					return Right;
+					break;
+				}
+				else if (masAria[obj.getY()][obj.getX() + 2] != 0 || masAria[obj.getY() + 1][obj.getX() + 2] != 0&&
+					masAria[obj.getY()][obj.getX()] >= 200)
+				{
+					obj.AntiShow();
+					nextstep=SetDirect(obj, 2);
+					obj.Show();
+					return nextstep;
+					break;
+				}
+			}
+			else if (masAria[obj.getY()][obj.getX()] >= 200)
+			{
+				obj.AntiShow();
+				nextstep=SetDirect(obj, 2);
+				obj.Show();
+				return nextstep;
+				break;
+			}
+		}
+		else obj.SetDirection(2);
+		obj.Show();
+		return Right;
+		break;
+	case Down:
+		if (obj.getDirection() == 4)
+		{
+			if (obj.getY() < GlobalSizeBattle - 2)
+			{
+				if (masAria[obj.getY() + 2][obj.getX()] == 0 && masAria[obj.getY() + 2][obj.getX() + 1] == 0)
+				{
+					obj.AntiShow();
+					obj.SetY(obj.getY() + 1);
+					obj.Show();
+					return Down;
+					break;
+				}
+				else if (masAria[obj.getY() + 2][obj.getX()] != 0 || masAria[obj.getY() + 2][obj.getX() + 1] != 0&&
+					masAria[obj.getY()][obj.getX()] >= 200)
+				{
+					obj.AntiShow();
+					nextstep =SetDirect(obj, 4);
+					obj.Show();
+					return nextstep;
+					break;
+				}
+			}
+			else if (masAria[obj.getY()][obj.getX()] >= 200)
+			{
+				obj.AntiShow();
+				nextstep=SetDirect(obj, 4);
+				obj.Show();
+				return nextstep;
+				break;
+			}
+		}
+		else obj.SetDirection(4);
+		obj.Show();
+		return Down;
+		break;
+	case 13://Enter
+		break;
+	}
+	//return obj;
+}
+//задание случайного направления движения
+int Rand()
+{
+	int dir = 0, temp = 0;
+	temp = 1+rand() % 4;
+	return SwichDirection(temp);
+}
+int MoveEnemy(int time, int Count, int dir)
+{
+	int temp = dir;
+	if (Count % 20 == 0)
+	{
+		dir = Rand();
+	}
+	//	dir = 75;
+	return dir;
+}
+//отображение массива игрового поля
+void Showmas(int mas[GlobalSizeBattle][GlobalSizeBattle])
+{
+	for (size_t i = 0; i < GlobalSizeBattle; i++)
+	{
+		for (size_t j = 0; j < GlobalSizeBattle; j++)
+		{
+			cout << mas[i][j] << "  ";
+		}cout << endl;
+	}
+}
+/*int ActivePunctResult(char mas[][30], int row)
+	{
+		int number = 0, key;
+		do
+		{
+			showMenuResult(mas, row, number);
+			key = _getch();
+			switch (key)
+			{
+			case
+			Up:
+				if (number >= 1)
+					number--;
+				break;
+			case Down:
+				if (number < row)
+					number++;
+				break;
+			case Enter:
+				return number;
+				break;
+			}
+		} while (key != esc);
+		return -1;
+	}*/
+void main()
+{
+	srand(time(NULL));
+	vector <ViewTank> Enemy;
+	vector<ViewTank> Self;
+	vector <int> enemydir;
+	ViewTank obj(9, 5, Green, 1, 1);
+	Self.push_back(obj);
+	int Count = 0;
+	for (size_t i = 0; i < 3; i++)
+	{
+		ViewTank enemy((rand() % 3) * 4, 1, Red, 2, i);
+		enemy.SetDirection(4);
+		Enemy.push_back(enemy);
+		enemydir.push_back(Down);
+	}
+	for (auto var : Self)
+		{
+			var.Show();
+		}
+		for (auto var : Enemy)
+		{
+			var.Show();
+		}
+	do
+	{
+		Sleep(200);
+		if (GetAsyncKeyState(VK_LEFT) & 0x8000)
+		{
+			Move(Left, Self.at(0));
+		}
+		if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
+		{
+			Move(Right, Self.at(0));
+		}
+		if (GetAsyncKeyState(VK_UP) & 0x8000)
+		{
+			Move(Up, Self.at(0));
+		}
+		if (GetAsyncKeyState(VK_DOWN) & 0x8000)
+		{
+			Move(Down, Self.at(0));
+		}
+		//Библеотека hrono для работы с тиками
+		for (size_t i = 0; i < Enemy.size(); i++)
+		{
+			enemydir.at(i) = MoveEnemy(0, Count, enemydir.at(i));
+			enemydir.at(i)=Move(enemydir.at(i), Enemy.at(i));
+		}
+		Count++;
+		if (Count > 20) Count = 0;
+		SetCursor(0, 20);
+		Showmas(masAria);
+	} while (true);
+
+}
